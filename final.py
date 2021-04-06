@@ -37,7 +37,7 @@ import scipy.stats
 rotatechange = 0.15
 speedchange = 0.15
 occ_bins = [-1, 0, 51, 101]
-stop_distance = 0.6
+stop_distance = 0.4
 front_angle = 30
 front_angles = range(-front_angle,front_angle+1,1)
 scanfile = 'lidar.txt'
@@ -188,8 +188,8 @@ class AutoNav(Node):
         grid_y = round(((cur_pos.y - map_origin.y) / map_res))
         
         self.get_logger().info('Grid X: %i Grid Y: %i' % (grid_x, grid_y))
-        print(cur_pos.x, cur_pos.y)
-        print()
+        # print(cur_pos.x, cur_pos.y)
+        # print()   
         
         # binnum go from 1 to 3 so we can use uint8
         # convert into 2D array using column order
@@ -373,7 +373,7 @@ class AutoNav(Node):
                 if arr[x][y] == -1:
                     count += 1
                 
-        if count == 5:
+        if count == 3:
             self.get_logger().info('Found neighbours')
             # print(i,j, arr[i][j])
             # check = [[i+1,j], [i+1,j+1], [i+1,j-1], [i-1,j], [i-1,j-1], [i-1,j+1], [i,j+1], [i,j-1]]
@@ -426,12 +426,9 @@ class AutoNav(Node):
             time.sleep(1)
             self.publisher_.publish(twist)
             rclpy.spin_once(self)
-            rclpy.spin_once(self)
-            rclpy.spin_once(self)
             return 
         
-        rclpy.spin_once(self)
-        rclpy.spin_once(self)
+
         rclpy.spin_once(self)
         # arr = self.occdata  
         # print('hi')
@@ -468,7 +465,8 @@ class AutoNav(Node):
                         else:
                             print('done pick_direction')
                             return 
-
+        
+        print('done pick_direction outside for loop')
         ## stop mapping function 
         # return 
 
@@ -658,7 +656,8 @@ class AutoNav(Node):
         grid_y = round(((cur_pos.y - map_origin.y) / map_res))
         print('coor after gotoBFS:', cur_pos.x, cur_pos.y, grid_x, grid_y )
         print("done gotoBFS")
-        return True
+        
+        self.pick_direction()
         
 
 
@@ -682,7 +681,7 @@ class AutoNav(Node):
             # initialize variable to write elapsed time to file
             # contourCheck = 1
 
-            # find direction with the largest distance from the Lidar,
+            # find direction with the largest distance from the Lid`ar,
             # rotate to that direction, and start moving
             self.pick_direction()
             # print('first pick_direction done')
@@ -691,31 +690,32 @@ class AutoNav(Node):
             while rclpy.ok():
                 # print('in while loop of mover')
                 if self.laser_range.size != 0:
+                    # print('checking laser range')
                     # print('in if statement')
                     # check distances in front of TurtleBot and find values less
                     # than stop_distance
                     lri = (self.laser_range[front_angles]<float(stop_distance)).nonzero()
                     # self.get_logger().info('Distances: %s' % str(lri))
 
-                    # if the list is not empty
+                       # if the list is not empty
                     if(len(lri[0])>0):
                         # stop moving
                         print('too near, calling stopbot')
                         self.stopbot()
-                        
-                        rclpy.spin_once(self)
-                        rclpy.spin_once(self)
-                        rclpy.spin_once(self) 
-                
                         # find direction with the largest distance from the Lidar
                         # rotate to that direction
                         # start moving
-                        self.pick_direction()
+                        # print('test 2nd pick')
+                        
+                        # self.pick_direction()
+                        # print('in mover, done pick_direction')
+                else:
+                    print('laser range 0')
                     
                 # allow the callback functions to run
+                # print('calling spin once in while')
                 rclpy.spin_once(self)
-                rclpy.spin_once(self)
-                rclpy.spin_once(self)  
+
 
         except Exception as e:
             print(e)
