@@ -48,6 +48,7 @@ points_skip = 10
 ignore_angle = 5
 # ignore_distance = 10
 basic_operations = 0
+neighbours_condition = 3
 
 # code from https://automaticaddison.com/how-to-convert-a-quaternion-into-euler-angles-in-python/
 def euler_from_quaternion(x, y, z, w):
@@ -373,7 +374,7 @@ class AutoNav(Node):
                 if arr[x][y] == -1:
                     count += 1
                 
-        if count == 3:
+        if count == neighbours_condition:
             self.get_logger().info('Found neighbours')
             # print(i,j, arr[i][j])
             # check = [[i+1,j], [i+1,j+1], [i+1,j-1], [i-1,j], [i-1,j-1], [i-1,j+1], [i,j+1], [i,j-1]]
@@ -468,7 +469,13 @@ class AutoNav(Node):
         
         print('done pick_direction outside for loop')
         ## stop mapping function 
-        # return 
+        # return
+        
+        #  make sound or something 
+        self.stopbot()
+
+        
+        
 
 ##--------------------------------------------------
 ##--------------------------------------------------
