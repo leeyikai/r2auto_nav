@@ -48,7 +48,7 @@ map_bg_color = 1
 points_skip = 15
 ignore_angle = 5
 # ignore_distance = 10
-neighbours_condition = 3
+neighbours_condition = 5
 
 bot_radius = 0.5
 
@@ -440,7 +440,6 @@ class AutoNav(Node):
         rclpy.spin_once(self)
         print('done spinonce in pick')
         
-        
 
         rclpy.spin_once(self)
         (row, col) = self.occdata.shape
@@ -452,16 +451,7 @@ class AutoNav(Node):
         with open("arr in pick_direction.txt", "wb") as f:
             # print('writing to file')
             np.savetxt(f, arr, fmt='%i', delimiter=",")
-          
-            
-        # im2 = Image.fromarray(self.occdata)
-        # im2.save("try occdata.jpeg")
-            
-            
-        # im = Image.fromarray(arr)
-        # im.save("try arr.jpeg")
-        
-        
+
         # for i in range(grid_x - bot_radius_in_grid, grid_x + bot_radius_in_grid):
         #     for j in range(grid_y - bot_radius_in_grid, grid_y + bot_radius_in_grid):
         for i in range(row):
@@ -505,15 +495,17 @@ class AutoNav(Node):
         self.get_logger().info('In pick_direction')
         
         rclpy.spin_once(self)
+        rclpy.spin_once(self)
+        rclpy.spin_once(self)
         (row, col) = self.occdata.shape
-        print(row,col)
+        # print(row,col)
         mat = [[self.occdata[i,j] for j in range(col)] for i in range(row)]
         a = grid_x
         b = grid_y 
         
         r = len(mat)
         c = len(mat[0])
-        print(r,c)
+        # print(r,c)
         
         low_row = 0 if (0 > a) else a
         low_column = 0 if (0 > b) else b - 1
@@ -521,25 +513,27 @@ class AutoNav(Node):
         high_column = c-1 if ((b + 1) >= c) else b + 1
       
         while ((low_row > 0 - r and low_column > 0 - c)):
-            print('in while loop')
+            # print('in while loop')
       
             i = low_column + 1
             while (i <= high_column and i < c and low_row >= 0):
                 # print( mat[low_row][i])
                 # hello()
-                if mat[low_row][i] == empty_space:
-                    (boolean,x,y) = self.neighbours(mat, low_row, i)
-                    if boolean:
-                        return self.gotoBFS(mat, grid_x, grid_y, low_row, i)
+                if 0<=low_row<row and 0<=i<col:
+                    if mat[low_row][i] == empty_space:
+                        (boolean,x,y) = self.neighbours(mat, low_row, i)
+                        if boolean:
+                            return self.gotoBFS(mat, grid_x, grid_y, low_row, i)
                 i += 1
             low_row -= 1
       
             i = low_row + 2
             while (i <= high_row and i < r and high_column < c):
-                if mat[i][high_column] == empty_space:
-                    (boolean,x,y) = self.neighbours(mat, i, high_column)
-                    if boolean:
-                        return self.gotoBFS(mat, grid_x, grid_y, i, high_column)
+                if 0<=i<row and 0<=high_column<col:
+                    if mat[i][high_column] == empty_space:
+                        (boolean,x,y) = self.neighbours(mat, i, high_column)
+                        if boolean:
+                            return self.gotoBFS(mat, grid_x, grid_y, i, high_column)
                 # hello()
                 # print(mat[i][high_column])
                 i += 1
@@ -547,19 +541,21 @@ class AutoNav(Node):
       
             i = high_column - 2
             while (i >= low_column and i >= 0 and high_row < r):
-                if mat[high_row][i] == empty_space:
-                    (boolean,x,y) = self.neighbours(mat, high_row, i)
-                    if boolean:
-                        return self.gotoBFS(mat, grid_x, grid_y, high_row, i)
+                if 0<=high_row<row and 0<=i<col:
+                    if mat[high_row][i] == empty_space:
+                        (boolean,x,y) = self.neighbours(mat, high_row, i)
+                        if boolean:
+                            return self.gotoBFS(mat, grid_x, grid_y, high_row, i)
                 i -= 1
             high_row += 1
       
             i = high_row - 2
             while (i > low_row and i >= 0 and low_column >= 0):
-                if mat[i][low_column] == empty_space:
-                    (boolean,x,y) = self.neighbours(mat, i, low_column)
-                    if boolean:
-                        return self.gotoBFS(mat, grid_x, grid_y, i, low_column)
+                if 0<=i<row and 0<=low_column<col:
+                    if mat[i][low_column] == empty_space:
+                        (boolean,x,y) = self.neighbours(mat, i, low_column)
+                        if boolean:
+                            return self.gotoBFS(mat, grid_x, grid_y, i, low_column)
                 i -= 1
             low_column -= 1
       
@@ -698,6 +694,8 @@ class AutoNav(Node):
     def gotoBFS(self, arr, i, j, x, y):
         self.get_logger().info('In gotoBFS')
         rclpy.spin_once(self)
+        rclpy.spin_once(self)
+        rclpy.spin_once(self)
         print(i,j, arr[i][j],x,y, arr[x][y])
         
         path = self.bfs(arr, (i,j), (x,y))
@@ -750,7 +748,7 @@ class AutoNav(Node):
         print('coor after gotoBFS:', cur_pos.x, cur_pos.y, grid_x, grid_y )
         print('done gotoBFS, calling pick_direction again')
         
-        self.pick_direction()
+        return 
         
 
 
@@ -801,7 +799,7 @@ class AutoNav(Node):
                         # start moving
                         # print('test 2nd pick')
                         
-                        return self.pick_direction()
+                        self.pick_direction()
                         # print('in mover, done pick_direction')
                 # else:
                 #     print('laser range 0')
