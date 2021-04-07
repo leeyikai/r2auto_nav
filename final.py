@@ -37,7 +37,8 @@ import scipy.stats
 rotatechange = 0.15
 speedchange = 0.15
 occ_bins = [-1, 0, 51, 101]
-stop_distance = 0.4
+# occ_bins_rotated = [-1, 0, 51, 101]
+stop_distance = 0.5
 front_angle = 30
 front_angles = range(-front_angle,front_angle+1,1)
 scanfile = 'lidar.txt'
@@ -47,10 +48,13 @@ map_bg_color = 1
 points_skip = 15
 ignore_angle = 5
 # ignore_distance = 10
-basic_operations = 0
 neighbours_condition = 3
 
 bot_radius = 0.5
+
+unmap = -1
+empty_space = 0
+wall = 1
 
 # code from https://automaticaddison.com/how-to-convert-a-quaternion-into-euler-angles-in-python/
 def euler_from_quaternion(x, y, z, w):
@@ -133,13 +137,13 @@ class AutoNav(Node):
         # print("In padding")
         for i in range(row):
             for j in range(col):
-                if self.occdata[i,j] == 1:
+                if self.occdata[i,j] == wall:
                     check = [(i+1,j), (i+1,j+1), (i+1,j-1), (i-1,j), (i-1,j-1), (i-1,j+1), (i,j+1), (i,j-1), (i,j)]         
                     for loc in check:
                         x = loc[0]
                         y = loc[1]
                         if 0<=x<=row and 0<=y<=col:
-                            arr[x][y] == 1
+                            arr[x][y] == wall
                     
         self.occ_data = arr
         # print('done padding')
@@ -191,7 +195,7 @@ class AutoNav(Node):
         grid_x = round((cur_pos.x - map_origin.x) / map_res)
         grid_y = round(((cur_pos.y - map_origin.y) / map_res))
         
-        bot_radius_in_grid = round(((bot_radius) / map_res))
+        # bot_radius_in_grid = round(((bot_radius) / map_res))
         
         self.get_logger().info('Grid X: %i Grid Y: %i' % (grid_x, grid_y))
         # print(cur_pos.x, cur_pos.y)
@@ -208,7 +212,6 @@ class AutoNav(Node):
         
         # print(self.occdata)
         self.occdata = self.occdata - 2
-        # self.occdata = np.rot90(self.occdata)
         
         with open("before padding.txt", "wb") as f:
             # print('writing to file')
@@ -222,8 +225,12 @@ class AutoNav(Node):
         # self.padding()
         
         with open("after padding.txt", "wb") as f:
-            # print('writing to file')
+            # print()('writing to file')
             np.savetxt(f, self.occdata.astype(int), fmt='%i', delimiter=",")
+        
+        # self.occdata = np.rot90(self.occdata)
+        
+
         # print('after padding:', self.occdata)
         
         # print to file
@@ -275,7 +282,7 @@ class AutoNav(Node):
 
         # rotate by 90 degrees so that the forward direction is at the top of the image
         rotated = img_transformed.rotate(np.degrees(yaw)-90, expand=True, fillcolor=map_bg_color)
-
+        
         # show the image using grayscale map
         # plt.imshow(img, cmap='gray', origin='lower')
         # plt.imshow(img_transformed, cmap='gray', origin='lower')
@@ -381,9 +388,9 @@ class AutoNav(Node):
                 # if arr[x][y] == 1:
                 #     print('empty space beside wall')
                 #     return (False, i, j)
-                if arr[x][y] == -1:
+                if arr[x][y] == unmap:
                     count += 1
-                
+                # 
         if count == neighbours_condition:
             self.get_logger().info('Found neighbours')
             # print(i,j, arr[i][j])
@@ -459,7 +466,7 @@ class AutoNav(Node):
             for j in range(col):
                 # print('in double for loop of pick_direction', i, j, arr[i, j])
                 # if 0<=i<row and 0<=j<col and arr[i][j] == 0:
-                if arr[i][j] == 0:
+                if arr[i][j] == empty_space:
                     # print("cell is zero, calling neighbours")
                     (boolean,x,y) = self.neighbours(arr, i, j)
                     if boolean:
@@ -578,13 +585,15 @@ class AutoNav(Node):
          # print(i[0], i[1], row, col )
          if 0 <= i[0] < row and 0 <= i[1] < col:
              # print('test', maze[i[0]][i[1]])
-             if maze[i[0]][i[1]] != 1 and i not in visited:
+             if maze[i[0]][i[1]] != wall and i not in visited:
                  final.append(i)
      return final
  
     
  
     def bfs(self, maze, start, end):
+        global basic_operations
+        basic_operations = 0
         # print('in bfs')
         '''"Brute-Force Search"
         :param maze(list): the maze to be navigated
@@ -608,7 +617,7 @@ class AutoNav(Node):
                     newPath = list(path)
                     newPath.append(adjacentSpace)
                     queue.append(newPath)
-                    global basic_operations
+
                     basic_operations += 1
                 visited.add(front)
         return None
@@ -664,7 +673,7 @@ class AutoNav(Node):
             # last iteration to reach destination 
             x = path[-1][0] * map_res + map_origin.x
             y = path[-1][1] * map_res + map_origin.y
-            print('[LOOK HERE] last gotoBFS:', count, cur_pos.x, cur_pos.y, x, y)
+            print('[LOOK HERE] last gotoBFS:', cur_pos.x, cur_pos.y, x, y)
             self.goto(cur_pos.x, cur_pos.y, x, y)
             cur_pos.x = x
             cur_pos.y = y
