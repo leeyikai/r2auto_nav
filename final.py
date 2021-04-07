@@ -431,7 +431,7 @@ class AutoNav(Node):
         
     ## mapping algo
     ## looping through occdata to find next location to go to
-    def pick_direction(self):
+    def pick_direction2(self):
         self.get_logger().info('In pick_direction')
         
         print('calling spinonce in pick')
@@ -444,6 +444,8 @@ class AutoNav(Node):
 
         rclpy.spin_once(self)
         (row, col) = self.occdata.shape
+
+        
         print('in pick idrection, row:', row,col)
         arr = [[self.occdata[i,j] for j in range(col)] for i in range(row)]
         
@@ -494,9 +496,73 @@ class AutoNav(Node):
         
         #  make sound or something 
         self.stopbot()
-
         
+##--------------------------------------------------
+##--------------------------------------------------
+##--------------------------------------------------
+            
+    def pick_direction(self):
+        self.get_logger().info('In pick_direction')
         
+        rclpy.spin_once(self)
+        (row, col) = self.occdata.shape
+        print(row,col)
+        mat = [[self.occdata[i,j] for j in range(col)] for i in range(row)]
+        a = grid_x
+        b = grid_y 
+        
+        r = len(mat)
+        c = len(mat[0])
+        print(r,c)
+        
+        low_row = 0 if (0 > a) else a
+        low_column = 0 if (0 > b) else b - 1
+        high_row = r-1 if ((a + 1) >= r) else a + 1
+        high_column = c-1 if ((b + 1) >= c) else b + 1
+      
+        while ((low_row > 0 - r and low_column > 0 - c)):
+            print('in while loop')
+      
+            i = low_column + 1
+            while (i <= high_column and i < c and low_row >= 0):
+                # print( mat[low_row][i])
+                # hello()
+                if mat[low_row][i] == empty_space:
+                    (boolean,x,y) = self.neighbours(mat, low_row, i)
+                    if boolean:
+                        return self.gotoBFS(mat, grid_x, grid_y, low_row, i)
+                i += 1
+            low_row -= 1
+      
+            i = low_row + 2
+            while (i <= high_row and i < r and high_column < c):
+                if mat[i][high_column] == empty_space:
+                    (boolean,x,y) = self.neighbours(mat, i, high_column)
+                    if boolean:
+                        return self.gotoBFS(mat, grid_x, grid_y, i, high_column)
+                # hello()
+                # print(mat[i][high_column])
+                i += 1
+            high_column += 1
+      
+            i = high_column - 2
+            while (i >= low_column and i >= 0 and high_row < r):
+                if mat[high_row][i] == empty_space:
+                    (boolean,x,y) = self.neighbours(mat, high_row, i)
+                    if boolean:
+                        return self.gotoBFS(mat, grid_x, grid_y, high_row, i)
+                i -= 1
+            high_row += 1
+      
+            i = high_row - 2
+            while (i > low_row and i >= 0 and low_column >= 0):
+                if mat[i][low_column] == empty_space:
+                    (boolean,x,y) = self.neighbours(mat, i, low_column)
+                    if boolean:
+                        return self.gotoBFS(mat, grid_x, grid_y, i, low_column)
+                i -= 1
+            low_column -= 1
+      
 
 ##--------------------------------------------------
 ##--------------------------------------------------
@@ -708,7 +774,7 @@ class AutoNav(Node):
             # initialize variable to write elapsed time to file
             # contourCheck = 1
 
-            # find direction with the largest distance from the Lid`ar,
+            # find direction with the largest distance from the Lidar,
             # rotate to that direction, and start moving
             self.moveforward()
             # print('first pick_direction done')
