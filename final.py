@@ -44,11 +44,13 @@ scanfile = 'lidar.txt'
 mapfile = 'map.txt'
 
 map_bg_color = 1
-points_skip = 10
+points_skip = 15
 ignore_angle = 5
 # ignore_distance = 10
 basic_operations = 0
 neighbours_condition = 3
+
+bot_radius = 0.5
 
 # code from https://automaticaddison.com/how-to-convert-a-quaternion-into-euler-angles-in-python/
 def euler_from_quaternion(x, y, z, w):
@@ -184,9 +186,12 @@ class AutoNav(Node):
         # get map grid positions for x, y position
         global grid_x
         global grid_y
+        global bot_radius_in_grid
         
         grid_x = round((cur_pos.x - map_origin.x) / map_res)
         grid_y = round(((cur_pos.y - map_origin.y) / map_res))
+        
+        bot_radius_in_grid = round(((bot_radius) / map_res))
         
         self.get_logger().info('Grid X: %i Grid Y: %i' % (grid_x, grid_y))
         # print(cur_pos.x, cur_pos.y)
@@ -198,11 +203,12 @@ class AutoNav(Node):
         self.occdata = np.array(binnum.reshape(msg.info.height,msg.info.width))
         
         # print to file
-        np.savetxt('maptry.txt', self.occdata)
+        # np.savetxt('maptry.txt', self.occdata)
         # print('saved file')
         
         # print(self.occdata)
         self.occdata = self.occdata - 2
+        # self.occdata = np.rot90(self.occdata)
         
         with open("before padding.txt", "wb") as f:
             # print('writing to file')
@@ -211,7 +217,7 @@ class AutoNav(Node):
         # print('before padding:', self.occdata)
         self.padding()
         self.padding()
-        self.padding()
+        # self.padding()
         # self.padding()
         # self.padding()
         
@@ -221,9 +227,13 @@ class AutoNav(Node):
         # print('after padding:', self.occdata)
         
         # print to file
-        np.savetxt(mapfile, self.occdata)
+        # np.savetxt(mapfile, self.occdata)
         # print('saved file')
         
+        # im = Image.fromarray(self.occdata)
+        # plt.imshow(im, cmap='gray', origin='lower')
+        # plt.draw_all()
+        # im.save("your_file.jpeg")
 
         # set current robot location to 0
         odata[grid_y][grid_x] = 0
@@ -366,7 +376,7 @@ class AutoNav(Node):
         for loc in check:
             x = loc[0]
             y = loc[1]
-            if 0<=x<=row and 0<=y<=col:
+            if 0<=x<row and 0<=y<col:
                 # print('neighbours:', x,y, arr[x][y])
                 # if arr[x][y] == 1:
                 #     print('empty space beside wall')
@@ -390,66 +400,65 @@ class AutoNav(Node):
         return (False, i, j)
     
     
-            # if 0<=x<row and 0<=y<col:
-            #     if arr[x][y] == -1:
-            #     # print('found -1')
-            #         unmap_count += 1
-            #     if arr[x][y] == 0:
-            #     # print('found -1')
-            #         empty_count += 1
-            # if unmap_count > 2 and empty_count > 3:
-            #     self.get_logger().info('Found destination')
-            #     return (False, i,j)
-            
-        # return (True, i, j)
-    
 ##--------------------------------------------------
 ##--------------------------------------------------
 ##--------------------------------------------------
+
+
+    def moveforward(self):
+        self.get_logger().info('No self.occdata, moving forward')
+        
+        # start moving
+        # self.get_logger().info('Start moving')
+        twist = Twist()
+        twist.linear.x = speedchange
+        twist.angular.z = 0.0
+        # not sure if this is really necessary, but things seem to work more
+        # reliably with this
+        time.sleep(1)
+        self.publisher_.publish(twist)
+        rclpy.spin_once(self)
+        return 
+
         
         
     ## mapping algo
     ## looping through occdata to find next location to go to
     def pick_direction(self):
         self.get_logger().info('In pick_direction')
-
         
-        if self.occdata.size == 0:
-            self.get_logger().info('No self.occdata, moving forward')
-            
-            # start moving
-            # self.get_logger().info('Start moving')
-            twist = Twist()
-            twist.linear.x = speedchange
-            twist.angular.z = 0.0
-            # not sure if this is really necessary, but things seem to work more
-            # reliably with this
-            time.sleep(1)
-            self.publisher_.publish(twist)
-            rclpy.spin_once(self)
-            return 
+        print('calling spinonce in pick')
+        rclpy.spin_once(self)
+        rclpy.spin_once(self)
+        rclpy.spin_once(self)
+        print('done spinonce in pick')
+        
         
 
         rclpy.spin_once(self)
-        # arr = self.occdata  
-        # print('hi')
         (row, col) = self.occdata.shape
-        # print('hi')
+        print('in pick idrection, row:', row,col)
         arr = [[self.occdata[i,j] for j in range(col)] for i in range(row)]
-        # print('hi')
-        # print('printing arr in pick_direction')
-        # print(arr)
-       
-        # print('row, col:', row, col)
         
-        # print('before double for loop')
-        # closure = False
-        # for i in range(row-1,-1,-1):
-        #     for j in range(col-1,-1,-1):
-                
+        with open("arr in pick_direction.txt", "wb") as f:
+            # print('writing to file')
+            np.savetxt(f, arr, fmt='%i', delimiter=",")
+          
+            
+        # im2 = Image.fromarray(self.occdata)
+        # im2.save("try occdata.jpeg")
+            
+            
+        # im = Image.fromarray(arr)
+        # im.save("try arr.jpeg")
+        
+        
+        # for i in range(grid_x - bot_radius_in_grid, grid_x + bot_radius_in_grid):
+        #     for j in range(grid_y - bot_radius_in_grid, grid_y + bot_radius_in_grid):
         for i in range(row):
             for j in range(col):
                 # print('in double for loop of pick_direction', i, j, arr[i, j])
+                # if 0<=i<row and 0<=j<col and arr[i][j] == 0:
                 if arr[i][j] == 0:
                     # print("cell is zero, calling neighbours")
                     (boolean,x,y) = self.neighbours(arr, i, j)
@@ -466,6 +475,11 @@ class AutoNav(Node):
                         else:
                             print('done pick_direction')
                             return 
+                        
+                        # x = x * map_res + map_origin.x
+                        # y = y * map_res + map_origin.y
+                        # return self.goto(arr, cur_pos.x, cur_pos.y, x, y)
+                    
         
         print('done pick_direction outside for loop')
         ## stop mapping function 
@@ -527,17 +541,6 @@ class AutoNav(Node):
             # endTime = time.time()
             # print('duration moving', endTime - startTime)
             
-            # if self.laser_range.size != 0:
-            #     # check distances in front of TurtleBot and find values less
-            #     # than stop_distance
-            #     lri = (self.laser_range[front_angles]<float(stop_distance)).nonzero()
-            #     # self.get_logger().info('Distances: %s' % str(lri))
-    
-            #     # if the list is not empty
-            #     if(len(lri[0])>0):
-            #         # stop moving
-            #         return 
-                            
             self.get_logger().info('In goto, Stop moving')
             twist = Twist()
             twist.linear.x = 0.0
@@ -548,7 +551,8 @@ class AutoNav(Node):
             # time.sleep(1)
             self.publisher_.publish(twist)
         print('done moving')
-
+        # self.pick_direction()
+# 
     
 ##--------------------------------------------------
 ##--------------------------------------------------
@@ -611,7 +615,6 @@ class AutoNav(Node):
     
     
 
-
 ##--------------------------------------------------
 ##--------------------------------------------------
 ##--------------------------------------------------
@@ -619,12 +622,18 @@ class AutoNav(Node):
     ## go to next location via bfs
     def gotoBFS(self, arr, i, j, x, y):
         self.get_logger().info('In gotoBFS')
-        # print(i,j, arr[i,j],x,y, arr[x,y])
+        rclpy.spin_once(self)
+        print(i,j, arr[i][j],x,y, arr[x][y])
+        
         path = self.bfs(arr, (i,j), (x,y))
         
         # no path to destination 
-        if path == False:
-            return False
+        if path == None:
+            x = x * map_res + map_origin.x
+            y = y * map_res + map_origin.y
+            print('path == None')
+            self.goto(cur_pos.x, cur_pos.y, x, y)
+            return 
         
         print('length path', len(path))
         print(path)
@@ -648,6 +657,7 @@ class AutoNav(Node):
             
             cur_pos.x = x
             cur_pos.y = y
+            rclpy.spin_once(self)
 
 
         if len(path) % points_skip > points_skip/2 :
@@ -658,11 +668,12 @@ class AutoNav(Node):
             self.goto(cur_pos.x, cur_pos.y, x, y)
             cur_pos.x = x
             cur_pos.y = y
+            rclpy.spin_once(self)
             
         grid_x = round((cur_pos.x - map_origin.x) / map_res)
         grid_y = round(((cur_pos.y - map_origin.y) / map_res))
         print('coor after gotoBFS:', cur_pos.x, cur_pos.y, grid_x, grid_y )
-        print("done gotoBFS")
+        print('done gotoBFS, calling pick_direction again')
         
         self.pick_direction()
         
@@ -690,7 +701,7 @@ class AutoNav(Node):
 
             # find direction with the largest distance from the Lid`ar,
             # rotate to that direction, and start moving
-            self.pick_direction()
+            self.moveforward()
             # print('first pick_direction done')
             # rclpy.spin_once(self)
 
@@ -709,15 +720,16 @@ class AutoNav(Node):
                         # stop moving
                         print('too near, calling stopbot')
                         self.stopbot()
+                        
                         # find direction with the largest distance from the Lidar
                         # rotate to that direction
                         # start moving
                         # print('test 2nd pick')
                         
-                        # self.pick_direction()
+                        return self.pick_direction()
                         # print('in mover, done pick_direction')
-                else:
-                    print('laser range 0')
+                # else:
+                #     print('laser range 0')
                     
                 # allow the callback functions to run
                 # print('calling spin once in while')
