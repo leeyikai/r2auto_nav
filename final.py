@@ -50,7 +50,7 @@ wall = 3
 
 pad = 2
 
-bfs_colour = 200
+# bfs_colour = 200
 # bot_colour = 100
 
 # code from https://automaticaddison.com/how-to-convert-a-quaternion-into-euler-angles-in-python/
@@ -198,7 +198,7 @@ class AutoNav(Node):
         self.get_logger().info('Grid X: %i Grid Y: %i, value: %i' % (grid_x, grid_y, self.occdata[grid_x, grid_y]))
         
         # print to file
-        np.savetxt(mapfile, self.occdata)
+        # np.savetxt(mapfile, self.occdata)
         
         # self.occdata = bot_colour
         img = Image.fromarray((self.occdata * 255).astype(np.uint8))
@@ -327,7 +327,7 @@ class AutoNav(Node):
 
         distance = ((x-i)**2+(y-j)**2)**0.5
         move_time = distance/speedchange
-        print(yaw_degrees, target, angle,distance, move_time)
+        # print(yaw_degrees, target, angle,distance, move_time)
 
         # rotate to that direction
         # if abs(yaw_degrees - target) > ignore_angle:
@@ -445,6 +445,7 @@ class AutoNav(Node):
             self.get_logger().info('No self.occdata, moving forward')
             return self.moveforward()
         
+        #to make sure the starting point isnt unmap for whatever reason 
         self.occdata[grid_x, grid_y] = empty_space
         path = self.bfs(self.occdata, (grid_x, grid_y), unmap)
         print('path', path)
@@ -484,9 +485,9 @@ class AutoNav(Node):
 
             self.goto(cur_pos.x, cur_pos.y, x, y)
             
-            print('[LOOK HERE] gotoBFS:', count, grid_x, grid_y, cur_pos.x, cur_pos.y)
-            print('[LOOK HERE] gotoBFS:', path[count][0], path[count][1], x, y)
-            print()
+            # print('[LOOK HERE] gotoBFS:', count, grid_x, grid_y, cur_pos.x, cur_pos.y)
+            # print('[LOOK HERE] gotoBFS:', path[count][0], path[count][1], x, y)
+            # print()
             
             cur_pos.x = x
             cur_pos.y = y
