@@ -50,7 +50,7 @@ wall = 3
 
 pad = 2
 
-# bfs_colour = 200
+bfs_colour = 200
 # bot_colour = 100
 
 # code from https://automaticaddison.com/how-to-convert-a-quaternion-into-euler-angles-in-python/
@@ -168,9 +168,13 @@ class AutoNav(Node):
 
         # find transform to obtain base_link coordinates in the map frame
         # lookup_transform(target_frame, source_frame, time)
+        global got_trans
+        
         try:
             trans = self.tfBuffer.lookup_transform('map', 'base_link', rclpy.time.Time())
+            got_trans = True
         except (LookupException, ConnectivityException, ExtrapolationException):
+            got_trans = False
             self.get_logger().info('No transformation found')
             return
         
@@ -196,6 +200,7 @@ class AutoNav(Node):
         grid_x = round((cur_pos.x - map_origin.x) / map_res)
         grid_y = round(((cur_pos.y - map_origin.y) / map_res))
         self.get_logger().info('Grid X: %i Grid Y: %i, value: %i' % (grid_x, grid_y, self.occdata[grid_x, grid_y]))
+        # self.get_logger().info('Grid Y: %i Grid X: %i, value: %i' % (grid_y, grid_x, self.occdata[grid_y, grid_x]))
         
         # print to file
         # np.savetxt(mapfile, self.occdata)
@@ -210,6 +215,7 @@ class AutoNav(Node):
         # plt.show()
         plt.draw_all()
         plt.pause(0.00000000001)
+        
 
 
 
@@ -441,11 +447,14 @@ class AutoNav(Node):
     def pick_direction(self):
         self.get_logger().info('In pick_direction')
         
-        if self.occdata.size == 0:
+        if self.occdata.size == 0 or not got_trans:
             self.get_logger().info('No self.occdata, moving forward')
             return self.moveforward()
         
         #to make sure the starting point isnt unmap for whatever reason 
+        # self.occdata[grid_y, grid_x] = empty_space
+        # path = self.bfs(self.occdata, (grid_y, grid_x), unmap)
+        
         self.occdata[grid_x, grid_y] = empty_space
         path = self.bfs(self.occdata, (grid_x, grid_y), unmap)
         print('path', path)
@@ -455,12 +464,14 @@ class AutoNav(Node):
         
         
         
+        
         if len(path) < points_skip:
             print('short path, going directly')
             x = path[-1][0] * map_res + map_origin.x
             y = path[-1][1] * map_res + map_origin.y
             
             return self.turn_and_move_forward(cur_pos.x, cur_pos.y, x, y)
+            # return self.turn_and_move_forward(cur_pos.y, cur_pos.x, y, x)
         
         
         print('long path, going indirectly')
@@ -475,7 +486,8 @@ class AutoNav(Node):
         # # omap = np.loadtxt(mapfile)
         # plt.imshow(img, origin='lower')
         # plt.show()
-        # plt.draw_all()
+        # # plt.draw_all()
+        # # plt.pause(0.00000000001)
         # plt.pause(2)
         
         
@@ -483,6 +495,7 @@ class AutoNav(Node):
             x = path[count][0] * map_res + map_origin.x
             y = path[count][1] * map_res + map_origin.y
 
+            # self.goto(cur_pos.y, cur_pos.x, y, x)
             self.goto(cur_pos.x, cur_pos.y, x, y)
             
             # print('[LOOK HERE] gotoBFS:', count, grid_x, grid_y, cur_pos.x, cur_pos.y)
