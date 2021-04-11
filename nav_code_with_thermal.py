@@ -31,29 +31,33 @@ import matplotlib.pyplot as plt
 from PIL import Image
 import scipy.stats
 
+from std_msgs.msg import String
+
 # constants
-rotatechange = 0.1
+rotatechange = 0.15
 speedchange = 0.15
 occ_bins = [-1, 0, 51, 101]
-stop_distance = 0.5
+stop_distance = 0.4
 front_angle = 30
 front_angles = range(-front_angle,front_angle+1,1)
 scanfile = 'lidar.txt'
 mapfile = 'map.txt'
 
-points_skip = 10
+points_skip = 5
 # ignore_angle = 5
 
-minus_value = 0
+unmap = 1
+empty_space = 2
+wall = 3
 
-unmap = 1 - minus_value
-empty_space = 2 - minus_value
-wall = 3 - minus_value
+pad = 4
 
-pad = 2
+bfs_colour = 200
+bot_colour = 100
 
-# bfs_colour = 200
-# bot_colour = 100
+thermal_angle = 2
+
+
 
 # code from https://automaticaddison.com/how-to-convert-a-quaternion-into-euler-angles-in-python/
 def euler_from_quaternion(x, y, z, w):
@@ -119,7 +123,25 @@ class AutoNav(Node):
             qos_profile_sensor_data)
         self.scan_subscription  # prevent unused variable warning
         self.laser_range = np.array([])
+        
+        
+        # create subscription to track thermal camera output 
+        self.launcher_subscription = self.create_subscription(
+            String,
+            'launcher_dir',
+            self.launcher_callback,
+            10)
+        
+        self.launcher_subscription
+        
+        self.shot  = False 
+        
+        
 
+    def launcher_callback(self, msg):
+        self.get_logger().info(msg.data)
+        self.thermal_msg = msg.data
+    
 
     def odom_callback(self, msg):
         # self.get_logger().info('In odom_callback')
@@ -139,12 +161,12 @@ class AutoNav(Node):
                 if self.occdata[i,j] == wall:
                     for k in range(i-pad, i+pad+1):
                         for l in range(j-pad, j+pad+1):        
-                            if 0<=k<=row and 0<=l<=col:
-                                arr[k][l] == wall
+                            if 0<=k<row and 0<=l<col:
+                                arr[k][l] = wall
                     
-        self.occ_data = arr
+        self.occ_data = np.array(arr)
         # print('done padding')
-        return
+        return self.occ_data
 
     def occ_callback(self, msg):
         self.get_logger().info('In occ_callback')
@@ -154,13 +176,20 @@ class AutoNav(Node):
         # and values between 50 and 100. The binned_statistic function will also
         # return the bin numbers so we can use that easily to create the image 
         occ_counts, edges, binnum = scipy.stats.binned_statistic(occdata, np.nan, statistic='count', bins=occ_bins)
-        self.occdata = np.array(binnum.reshape(msg.info.height,msg.info.width))
-        # self.occdata = self.occdata - minus_value
-        
-        
-        self.occdata = self.occdata.astype(int)
-        self.padding(pad)
-        
+        self.occdata = np.uint8(binnum.reshape(msg.info.height,msg.info.width))
+
+        # print to file
+        # np.savetxt(mapfile, self.occdata)
+        with open("before padding.txt", "wb") as f:
+            # print('writing to file')
+            np.savetxt(f, self.occdata.astype(int), fmt='%i', delimiter=",")
+            
+        self.occdata = self.padding(pad)
+            
+        with open("after padding.txt", "wb") as f:
+            # print()('writing to file')
+            np.savetxt(f, self.occdata.astype(int), fmt='%i', delimiter=",")
+            
         # print('done self.occdata')
         
         # get width and height of map
@@ -178,12 +207,6 @@ class AutoNav(Node):
         except (LookupException, ConnectivityException, ExtrapolationException):
             self.get_logger().info('No transformation found')
             return
-        
-
-        
-        with open("savemap.txt", "wb") as f:
-            # print('writing to file')
-            np.savetxt(f, self.occdata.astype(int), fmt='%i', delimiter=",")
         
         global cur_pos
         global cur_rot
@@ -204,14 +227,13 @@ class AutoNav(Node):
         
         global grid_x
         global grid_y
-        grid_x = round((cur_pos.x - map_origin.x) / map_res)
-        grid_y = round(((cur_pos.y - map_origin.y) / map_res))
-        self.get_logger().info('Grid X: %i Grid Y: %i, value: %i' % (grid_x, grid_y, self.occdata[grid_x, grid_y]))
+        grid_y = round((cur_pos.x - map_origin.x) / map_res)
+        grid_x = round(((cur_pos.y - map_origin.y) / map_res))
+        # self.get_logger().info('Grid X: %i Grid Y: %i, yaw: %f' % (grid_x, grid_y, math.degrees(self.yaw)))
         
-        # print to file
-        # np.savetxt(mapfile, self.occdata)
+
         
-        # self.occdata = bot_colour
+        # self.occdata[grid_x, grid_y] = bot_colour
         img = Image.fromarray((self.occdata * 255).astype(np.uint8))
         # 
         
@@ -299,59 +321,52 @@ class AutoNav(Node):
         self.publisher_.publish(twist)
     
     
-    
+
     
     def turn_and_move_forward(self, i, j, x, y):
         self.get_logger().info('In turn_and_move_forward')
         # print(i,j,x,y)
+     
+        (angle, distance) = self.get_angle_and_dist(i, j, x, y) 
 
-        target = math.degrees(math.atan2((x-i),(y-j)))  % 360
-        yaw_degrees = math.degrees(self.yaw) % 360 
-        angle = (target - yaw_degrees) % 360 
-
-        distance = ((x-i)**2+(y-j)**2)**0.5
-        # move_time = distance/speedchange
-        # print(yaw_degrees, target, angle,distance, move_time)
-
-        # rotate to that direction
-        # if abs(yaw_degrees - target) > ignore_angle:
         self.get_logger().info('Rotating first, picked direction: %d %f m ' % (angle, distance))
         self.rotatebot(float(angle))
-        # self.yaw = math.radians(target)
-        # else:
-        #     self.get_logger().info('Current angle: %d, desired angle: %d, angle negligible, not rotating' % (math.degrees(self.yaw), target))
-            
-        
+
         self.moveforward()
         
         
+        
+        
+    def get_angle_and_dist(self, i, j, x, y):    
+        # target = math.degrees(math.atan2((y-j),(x-i)))  % 360
+        target = math.degrees(math.atan2((x-i), (y-j)))  % 360
+        yaw_degrees = math.degrees(self.yaw) % 360 
+        angle = (target - yaw_degrees) % 360 
+        
+        distance = ((x-i)**2+(y-j)**2)**0.5 * cur_map_res
+        # angle = -angle % 360
+        return (angle, distance)
+
+
 
     ## go to next location directly 
     def goto(self, i, j, x, y):
         self.get_logger().info('In goto')
-        # print(i,j,x,y)
-        self.get_logger().info(' X: %i  Y: %i, Target  X: %i  Grid Y: %i' % (i, j, x, y))
+        print(i,j,x,y)
+        # self.get_logger().info(' X: %i  Y: %i, Target  X: %i  Grid Y: %i' % (i, j, x, y))
 
-        target = math.degrees(math.atan2((x-i),(y-j)))  % 360
-        yaw_degrees = math.degrees(self.yaw) % 360 
-        angle = (target - yaw_degrees) % 360 
 
-        distance = ((x-i)**2+(y-j)**2)**0.5
+        (angle, distance) = self.get_angle_and_dist(i, j, x, y)  
+
         move_time = distance/speedchange
-        # print(yaw_degrees, target, angle,distance, move_time)
+        print(angle, distance, move_time)
 
-        # rotate to that direction
-        # if abs(yaw_degrees - target) > ignore_angle:
+
         self.get_logger().info('Rotating first, picked direction: %d %.2f m ' % (angle, distance))
         self.rotatebot(float(angle))
-        # self.yaw = math.radians(target)
-        # else:
-        #     self.get_logger().info('Current angle: %d, desired angle: %d, angle negligible, not rotating' % (math.degrees(self.yaw), target))
-            
-        # 
+
+        
         if distance > 0:
-            # start moving
-            # self.get_logger().info('Start moving')
             print('In goto, Start moving')
             twist = Twist()
             twist.linear.x = speedchange
@@ -359,15 +374,11 @@ class AutoNav(Node):
             
             time.sleep(1)
             self.publisher_.publish(twist)
-            # startTime = time.time()
+
             print('moving')
             
-            
-            # move for this amount of time
             time.sleep(move_time)
-            # endTime = time.time()
-            # print('duration moving', endTime - startTime)
-            
+
             self.get_logger().info('In goto, Stop moving')
             twist = Twist()
             twist.linear.x = 0.0
@@ -392,10 +403,10 @@ class AutoNav(Node):
          spaces.append((space[0]+1, space[1]))  # Down
          spaces.append((space[0], space[1]-1))  # Left
          spaces.append((space[0], space[1]+1))  # Right
-         spaces.append((space[0]-1, space[1]+1))  # Up right 
-         spaces.append((space[0]+1, space[1]-1))  # Down left 
-         spaces.append((space[0]-1, space[1]-1))  # Up Left 
-         spaces.append((space[0]+1, space[1]+1))  # Down Right
+         # spaces.append((space[0]-1, space[1]+1))  # Up right 
+         # spaces.append((space[0]+1, space[1]-1))  # Down left 
+         # spaces.append((space[0]-1, space[1]-1))  # Up Left 
+         # spaces.append((space[0]+1, space[1]+1))  # Down Right
          
          row = len(maze)
          col = len(maze[0])
@@ -406,7 +417,7 @@ class AutoNav(Node):
              # print(i[0], i[1], row, col )
              if 0 <= i[0] < row and 0 <= i[1] < col:
                  # print('test', maze[i[0]][i[1]])
-                 if maze[i[1], i[0]] != wall and i not in visited:
+                 if maze[i[0], i[1]] != wall and i not in visited:
                      final.append(i)
          # print('done adj')
          return final
@@ -434,7 +445,7 @@ class AutoNav(Node):
                 path = queue.pop(0)
             front = path[-1]
             # print(front)
-            if maze[front[1], front[0]] == endCond:
+            if maze[front[0], front[1]] == endCond:
                 return path
             elif front not in visited:
                 for adjacentSpace in self.getAdjacentSpaces(maze, front, visited):
@@ -450,70 +461,98 @@ class AutoNav(Node):
 
 
     def pick_direction(self):
+
         self.get_logger().info('In pick_direction')
         
         if self.occdata.size == 0:
             self.get_logger().info('No self.occdata, moving forward')
             return self.moveforward()
         
+        global cur_map_res
+        cur_map_res = map_res
+        
         #to make sure the starting point isnt unmap for whatever reason 
-        self.occdata[grid_y, grid_x] = empty_space
-        path = self.bfs(self.occdata, (grid_y, grid_x), unmap)
+        self.occdata[grid_x, grid_y] = empty_space
+        path = self.bfs(self.occdata, (grid_x, grid_y), unmap)
         
-        # self.occdata[grid_x, grid_y] = empty_space
-        # path = self.bfs(self.occdata, (grid_x, grid_y), unmap)
         print('path', path)
-        # x = path[-1][0] 
-        # y = path[-1][1] 
-        # print('value at latest', self.occdata[x,y])
-        
-        
-        
+
+
         if len(path) < points_skip:
             print('short path, going directly')
-            x = path[-1][0] * map_res + map_origin.x
-            y = path[-1][1] * map_res + map_origin.y
+            i = path[0][0] 
+            j = path[0][1] 
+            x = path[-1][0] 
+            y = path[-1][1] 
             
+            print('[LOOK HERE]', i, j, x, y)
+            return self.turn_and_move_forward(i, j, x, y)
             # return self.turn_and_move_forward(cur_pos.y, cur_pos.x, y, x)
-            return self.turn_and_move_forward(cur_pos.x, cur_pos.y, x, y)
         
+
+
+
+
+
         
-        print('long path, going indirectly')
         # for count in range(len(path)):
         #     x = path[count][0] 
         #     y = path[count][1] 
-        #     self.occdata[y,x] = bfs_colour
+        #     self.occdata[x,y] = bfs_colour
         
+
         # plt.figure()
-        # img = Image.fromarray((self.occdata * 255).astype(np.uint8))
+        # img2 = Image.fromarray((self.occdata * 255).astype(np.uint8))
         # # img = Image.fromarray(self.occdata)
         # # omap = np.loadtxt(mapfile)
-        # plt.imshow(img, origin='lower')
+        # plt.imshow(img2, origin='lower')
         # plt.show()
-        # plt.draw_all()
+        # # plt.draw_all()
+        # plt.pause(0.00000000001)
         # plt.pause(2)
-        
-        
+
+
+
+
+
+        print('long path, going indirectly')
         for count in range(points_skip, len(path), points_skip):
-            x = path[count][0] * map_res + map_origin.x
-            y = path[count][1] * map_res + map_origin.y
 
-            self.goto(cur_pos.y, cur_pos.x, y, x)
-            # self.goto(cur_pos.x, cur_pos.y, x, y)
+            i = path[count-points_skip][0] 
+            j = path[count-points_skip][1] 
+            x = path[count][0] 
+            y = path[count][1] 
+            print('[LOOK HERE]', count, i, j, x, y)
+            
+            self.goto(i, j, x, y)
 
-            
-            # print('[LOOK HERE] gotoBFS:', count, grid_x, grid_y, cur_pos.x, cur_pos.y)
-            # print('[LOOK HERE] gotoBFS:', path[count][0], path[count][1], x, y)
-            # print()
-            
-            cur_pos.x = x
-            cur_pos.y = y
-        
-        
+
         self.moveforward()
 
         print('done pick_direction')
         return 
+
+
+
+    def thermal(self):
+        # self.get_logger().info(msg.data)
+        
+        while True:
+            if(self.thermal_msg == "left"):
+                print("turning left")
+                self.rotatebot(thermal_angle)
+                
+            elif(self.thermal_msg == "right"):
+                print("turning right")
+                self.rotatebot(-thermal_angle%360)
+                
+            elif(self.thermal_msg == "completed"):
+                print("shot done")
+                self.shot = True 
+                return self.pick_direction()
+
+        
+        
 
 
 
@@ -527,6 +566,7 @@ class AutoNav(Node):
         self.publisher_.publish(twist)
 
 
+
     def mover(self):
         try:
             # initialize variable to write elapsed time to file
@@ -537,12 +577,15 @@ class AutoNav(Node):
             self.pick_direction()
 
             while rclpy.ok():
+                if self.thermal_msg == 'start' and not self.shot:
+                        self.thermal()
+                        
                 if self.laser_range.size != 0:
                     # check distances in front of TurtleBot and find values less
                     # than stop_distance
                     lri = (self.laser_range[front_angles]<float(stop_distance)).nonzero()
                     # self.get_logger().info('Distances: %s' % str(lri))
-
+                     
                     # if the list is not empty
                     if(len(lri[0])>0):
                         # stop moving
@@ -550,6 +593,7 @@ class AutoNav(Node):
                         # find direction with the largest distance from the Lidar
                         # rotate to that direction
                         # start moving
+                        
                         self.pick_direction()
                     
                 # allow the callback functions to run
