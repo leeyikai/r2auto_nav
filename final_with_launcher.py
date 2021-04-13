@@ -58,7 +58,7 @@ pad = 3
 bfs_colour = 200
 bot_colour = 100
 
-compensate_distance = 0.03
+compensate_distance = 0.05
 compensate_time = 0
 compensate_angle = 1
     
