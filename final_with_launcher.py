@@ -67,9 +67,10 @@ compensate_angle = 1
 
 # thermal_angle = 2
 bfs_rotatechange = 0.1
-spin360_angle = 178
+# spin360_angle = 179
 
 spin_freq = 2
+turn_freq = 10
 
 
 
@@ -427,19 +428,28 @@ class AutoNav(Node):
         if (count // points_skip) % spin_freq == 0:
             print('SPINNGING NOWWWWWWW')
             
-            print(self.rotatechange)
+            # print(self.rotatechange)
             self.rotatechange = bfs_rotatechange
-            print(self.rotatechange)
-            
+            # print(self.rotatechange)
+        
             time.sleep(1)
             
-            self.rotatebot(spin360_angle)
-            self.rotatebot(spin360_angle)
-            
+            for i in range(turn_freq):
+                print('turning', i)
+                if self.thermal_msg:
+                    print('stopping in turning')
+                    while not self.shot:
+                        self.thermal(self.thermal_msg)
+                    break
+                        
+                self.rotatebot(360/turn_freq)
+                time.sleep(0.5)
+        
+            print('done turning', i)
             self.rotatechange = const_rotatechange
             time.sleep(1)
             
-            print(self.rotatechange)
+            # print(self.rotatechange)
 
 
         print('done moving')
@@ -549,21 +559,21 @@ class AutoNav(Node):
 
 
         
-        for count in range(len(path)):
-            x = path[count][0] 
-            y = path[count][1] 
-            self.occdata[x,y] = bfs_colour
+        # for count in range(len(path)):
+        #     x = path[count][0] 
+        #     y = path[count][1] 
+        #     self.occdata[x,y] = bfs_colour
         
 
-        plt.figure()
-        img2 = Image.fromarray((self.occdata * 255).astype(np.uint8))
-        # img = Image.fromarray(self.occdata)
-        # omap = np.loadtxt(mapfile)
-        plt.imshow(img2, origin='lower')
-        plt.show()
-        # plt.draw_all()
-        plt.pause(0.00000000001)
-        plt.pause(2)
+        # plt.figure()
+        # img2 = Image.fromarray((self.occdata * 255).astype(np.uint8))
+        # # img = Image.fromarray(self.occdata)
+        # # omap = np.loadtxt(mapfile)
+        # plt.imshow(img2, origin='lower')
+        # plt.show()
+        # # plt.draw_all()
+        # plt.pause(0.00000000001)
+        # plt.pause(2)
 
 
 
