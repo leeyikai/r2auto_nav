@@ -1,4 +1,3 @@
-  GNU nano 4.8                                                                     launcher.py                                                                               
 import sys
 import time
 import RPi.GPIO as GPIO
@@ -21,6 +20,7 @@ amg = adafruit_amg88xx.AMG88XX(i2c)
 solenoid_pin = 13
 servo_pin = 16
 motor_pin = 12
+temperature = 25
 
 
 GPIO.setup(solenoid_pin, GPIO.OUT)
@@ -87,7 +87,7 @@ class Launcher(Node):
                         print(transposeAmg[i])
                     for i in range(8):
                         for j in range(8):
-                            if(transposeAmg[i][j] >= 25):
+                            if(transposeAmg[i][j] >= temperature):
                                 foundTop = 1
                                 rowLeft = i
                                 colTop= j
@@ -98,7 +98,7 @@ class Launcher(Node):
                             break 
                     for i in range(7, -1, -1):
                         for j in range(7, -1, -1):
-                            if(transposeAmg[i][j] >= 25):
+                            if(transposeAmg[i][j] >= temperature):
                                 rowRight = i
                                 colBot = j
                                 foundBot = 1
