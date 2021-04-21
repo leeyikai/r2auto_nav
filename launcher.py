@@ -20,7 +20,7 @@ amg = adafruit_amg88xx.AMG88XX(i2c)
 solenoid_pin = 13
 servo_pin = 16
 motor_pin = 12
-temperature = 25
+temperature = 25 #threshold temperature for target
 
 
 GPIO.setup(solenoid_pin, GPIO.OUT)
@@ -69,7 +69,7 @@ class Launcher(Node):
                 servo.ChangeDutyCycle(5)
                 time.sleep(0.05)
                 servo.ChangeDutyCycle(0)
-            def fire():
+            def fire(): #firing sequence
                 GPIO.output(motor_pin, GPIO.HIGH)
                 time.sleep(1)
                 triggerSolenoid()
@@ -87,6 +87,7 @@ class Launcher(Node):
                         print(transposeAmg[i])
                     for i in range(8):
                         for j in range(8):
+                            #finds top left hot pixel
                             if(transposeAmg[i][j] >= temperature):
                                 foundTop = 1
                                 rowLeft = i
@@ -98,6 +99,7 @@ class Launcher(Node):
                             break 
                     for i in range(7, -1, -1):
                         for j in range(7, -1, -1):
+                            #finds bottom right hot pixel
                             if(transposeAmg[i][j] >= temperature):
                                 rowRight = i
                                 colBot = j
@@ -109,23 +111,28 @@ class Launcher(Node):
                         self.publisher.publish("start")
                         self.get_logger().info("start")
                         print(rowLeft, colTop, rowRight, colBot)
+                        #using top left and bot right hot pixels, we determine the area of where it is hot and find the 
+                        #center of this hot area using meanRow and meanCol
                         meanRow = (rowLeft + rowRight)/2
                         meanCol = (colTop + colBot)/2
-                        print(meanRow)
-                        print(meanCol)
+                        #meanCol controls the up down pitching while meanRow determines the left right turning
                         if(meanRow <= 4 and meanRow >= 3 and meanCol <= 3 and meanCol >= 2):
                             toFire = 1
                             print("fire")
                         elif(meanRow >= 0 and meanCol >= 0):
-                            if(meanCol < 2):
+                            if(meanCol < 2): 
+                               upPitch()
                                print("up")
                             if(meanCol > 3):
+                                downPitch()
                                 print("down")
                             if(meanRow < 3):
+                                #too far left
                                 self.publisher.publish("right")
                                 self.get_logger().info("right")
                                 print("right")
                             if(meanRow > 4):
+                                #too far right
                                 self.publisher.publish("left")
                                 self.get_logger().info("left")
 
@@ -140,9 +147,11 @@ class Launcher(Node):
 
                     if(toFire == 1):
                         print("fire")
-                        toFire = 0;
-                        #fire()
-                        finishFire = 1;
+                        toFire = 0
+                        fire()
+                        fire()
+                        fire()
+                        finishFire = 1
 
                     if(finishFire):
                         self.publisher.publish("completed")
