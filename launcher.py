@@ -16,10 +16,13 @@ i2c = busio.I2C(board.SCL, board.SDA)
 amg = adafruit_amg88xx.AMG88XX(i2c)
 
 
-
+#pins on the RPi which corresponds to the solenoid, servo and motor
 solenoid_pin = 13
 servo_pin = 16
 motor_pin = 12
+
+#controls the temperature threshold for the AMG
+temperature = 30
 
 
 GPIO.setup(solenoid_pin, GPIO.OUT)
@@ -78,7 +81,7 @@ class Launcher(Node):
                         print(transposeAmg[i])
                     for i in range(8):
                         for j in range(8):
-                            if(transposeAmg[i][j] >= 30):
+                            if(transposeAmg[i][j] >= temperature):
                                 foundTop = 1
                                 rowLeft = i
                                 colTop= j
@@ -87,7 +90,7 @@ class Launcher(Node):
                             break 
                     for i in range(7, -1, -1):
                         for j in range(7, -1, -1):
-                            if(transposeAmg[i][j] >= 30):
+                            if(transposeAmg[i][j] >= temperature):
                                 rowRight = i
                                 colBot = j
                                 foundBot = 1
@@ -102,11 +105,10 @@ class Launcher(Node):
                             self.publisher_.publish(msg)
                             self.get_logger().info(msg.data)
                             start = 1
-                        #print(rowLeft, colTop, rowRight, colBot)
                         meanRow = (rowLeft + rowRight)/2
                         meanCol = (colTop + colBot)/2
-                        #print(meanRow)
-                        #print(meanCol)
+                        #meanRow controls the up down pitch
+                        #meanCol controls the left and right
                         if(meanRow <= 5 and meanRow >= 3 and meanCol <= 4 and meanCol >= 3):
                             toFire = 1
                             print("fire")
@@ -140,9 +142,8 @@ class Launcher(Node):
                         fire()
                         fire()
                         fire()
-                        toFire = 0;
-                        #fire()
-                        finishFire = 1;
+                        toFire = 0
+                        finishFire = 1
                         
                     if(finishFire):
                         msg.data = "completed"
