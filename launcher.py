@@ -20,7 +20,6 @@ amg = adafruit_amg88xx.AMG88XX(i2c)
 solenoid_pin = 13
 servo_pin = 16
 motor_pin = 12
-temperature = 25 #threshold temperature for target
 
 
 GPIO.setup(solenoid_pin, GPIO.OUT)
@@ -34,22 +33,14 @@ GPIO.output(solenoid_pin, GPIO.LOW)
 servo.start (0)
 #FS90R adjust angle, DC motor on, rev for 5s, solenoid fire
 
-print("wat")
 class Launcher(Node):
         def __init__(self):
             super().__init__('Launcher')
-            self.publisher = self.create_publisher(String,"launcher_dir",10)
-
-   
-        timer_period = 0.1
-            self.timer = self.create_timer(timer_period, self.timer_callback)
-            self.i = 0
-
-        def timer_callback(self):
-            msg = String()
-            self.get_logger().info(msg.data)
+            self.publisher_ = self.create_publisher(String,"launcher_dir",10)
         def launch(self):
+            msg = String()
             counter = 0
+            finishFire = 0
             rowLeft = -1
             rowRight = -1
             colTop = -1
@@ -57,9 +48,10 @@ class Launcher(Node):
             toFire = 0
             meanRow = -1
             meanCol = -1
-            finishFire = 0
             foundTop = 0
             foundBot = 0
+            found = 0
+            start = 0
             maxRowValues = [0 for i in range(8)]
             def upPitch():
                 servo.ChangeDutyCycle(7.5)
@@ -69,7 +61,7 @@ class Launcher(Node):
                 servo.ChangeDutyCycle(5)
                 time.sleep(0.05)
                 servo.ChangeDutyCycle(0)
-            def fire(): #firing sequence
+            def fire():
                 GPIO.output(motor_pin, GPIO.HIGH)
                 time.sleep(1)
                 triggerSolenoid()
@@ -81,26 +73,21 @@ class Launcher(Node):
                 GPIO.output(solenoid_pin, GPIO.LOW)
             try:
                 while finishFire == 0:
-                    print("2")
                     transposeAmg = np.rot90(amg.pixels)
                     for i in range(8):
                         print(transposeAmg[i])
                     for i in range(8):
                         for j in range(8):
-                            #finds top left hot pixel
-                            if(transposeAmg[i][j] >= temperature):
+                            if(transposeAmg[i][j] >= 30):
                                 foundTop = 1
                                 rowLeft = i
                                 colTop= j
                                 break
                         if(foundTop == 1):
                             break 
-                            if(foundTop == 1):
-                            break 
                     for i in range(7, -1, -1):
                         for j in range(7, -1, -1):
-                            #finds bottom right hot pixel
-                            if(transposeAmg[i][j] >= temperature):
+                            if(transposeAmg[i][j] >= 30):
                                 rowRight = i
                                 colBot = j
                                 foundBot = 1
@@ -108,35 +95,36 @@ class Launcher(Node):
                         if(foundBot == 1):
                             break
                     if(foundTop == 1 and foundBot == 1):
-                        self.publisher.publish("start")
-                        self.get_logger().info("start")
+                        found = 1;
                         print(rowLeft, colTop, rowRight, colBot)
-                        #using top left and bot right hot pixels, we determine the area of where it is hot and find the 
-                        #center of this hot area using meanRow and meanCol
+                        if(start == 0):
+                            msg.data = "start"
+                            self.publisher_.publish(msg)
+                            self.get_logger().info(msg.data)
+                            start = 1
+                        #print(rowLeft, colTop, rowRight, colBot)
                         meanRow = (rowLeft + rowRight)/2
                         meanCol = (colTop + colBot)/2
-                        #meanCol controls the up down pitching while meanRow determines the left right turning
-                        if(meanRow <= 4 and meanRow >= 3 and meanCol <= 3 and meanCol >= 2):
+                        #print(meanRow)
+                        #print(meanCol)
+                        if(meanRow <= 5 and meanRow >= 3 and meanCol <= 4 and meanCol >= 3):
                             toFire = 1
                             print("fire")
                         elif(meanRow >= 0 and meanCol >= 0):
-                            if(meanCol < 2): 
-                               upPitch()
-                               print("up")
-                            if(meanCol > 3):
-                                downPitch()
-                                print("down")
                             if(meanRow < 3):
-                                #too far left
-                                self.publisher.publish("right")
-                                self.get_logger().info("right")
-                                print("right")
-                            if(meanRow > 4):
-                                #too far right
-                                self.publisher.publish("left")
-                                self.get_logger().info("left")
-
-                                print("left")
+                                print("up")
+                                upPitch()
+                            if(meanRow > 5):
+                                print("down")
+                                downPitch()
+                            if(meanCol < 4):
+                                msg.data = "left"
+                                self.publisher_.publish(msg)
+                                self.get_logger().info(msg.data)
+                            elif(meanCol > 4):
+                                msg.data = "right"
+                                self.publisher_.publish(msg)
+                                self.get_logger().info(msg.data)
                     time.sleep(0.5)
                     rowLeft = -1
                     rowRight = -1
@@ -144,36 +132,31 @@ class Launcher(Node):
                     rowLeft = -1
                     foundTop = 0
                     foundBot = 0
-
+                        
                     if(toFire == 1):
-                        print("fire")
-                        toFire = 0
+                        msg.data = "fire"
+                        self.publisher_.publish(msg)
+                        self.get_logger().info(msg.data)
                         fire()
                         fire()
                         fire()
-                        finishFire = 1
-
+                        toFire = 0;
+                        #fire()
+                        finishFire = 1;
+                        
                     if(finishFire):
-                        self.publisher.publish("completed")
-
+                        msg.data = "completed"
+                        self.publisher_.publish(msg)
+                        self.get_logger().info(msg.data)
             except KeyboardInterrupt:
                 GPIO.cleanup()
 
 def main(args=None):
         rclpy.init(args=args)
-        print("start")
-              launcher = Launcher()
-        print("go")
-        rclpy.spin(launcher)
+        launcher = Launcher()
         launcher.launch()
         launcher.destroy_node()
         rclpy.shutdown()
 
 if __name__ == '__main__':
     main()
-
-
-
-
-                            
-
